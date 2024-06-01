@@ -1,5 +1,6 @@
 import json, socket, time
 from ds_client import send_and_recv
+from Profile import Profile
 
 PORT = 3021
 
@@ -14,6 +15,8 @@ class DirectMessage(dict):
 
 class DirectMessenger:
     def __init__(self, dsuserver=None, username=None, password=None):
+        self.username = username
+        self.password = password
         self.sent, self.recv, self.token = join_server(dsuserver, username, password)
 
     def send(self, message:str, recipient:str) -> bool:
