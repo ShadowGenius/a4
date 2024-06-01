@@ -1,21 +1,16 @@
-import socket
-import time
+import json, socket, time
 from ds_client import send_and_recv
 
 PORT = 3021
 
-class DirectMessage:
+class DirectMessage(dict):
     def __init__(self, recipient, message, timestamp = 0):
         self.recipient = recipient
         self.message = message
         self.timestamp = timestamp
-
-    def __str__(self):
         if self.timestamp == 0:
             self.timestamp = time.time()
-        return f'''{{"entry": "{self.message}",
-                     "recipient": "{self.recipient}",
-                     "timestamp": {self.timestamp}}}'''
+        dict.__init__(self, entry=self.message, recipient=self.recipient, timestamp=self.timestamp)
 
 class DirectMessenger:
     def __init__(self, dsuserver=None, username=None, password=None):
@@ -24,6 +19,7 @@ class DirectMessenger:
     def send(self, message:str, recipient:str) -> bool:
         ''' returns true if message successfully sent, false if send failed. '''
         new_dm = DirectMessage(recipient, message)
+        new_dm = json.dumps(new_dm)
         post_msg = f'{{"token":"{self.token}", "directmessage": {new_dm}}}'
         recv_msg = send_and_recv(self.sent, self.recv, post_msg)
         if recv_msg.type == "ok":
