@@ -169,9 +169,12 @@ class MainApp(tk.Frame):
 
     def send_message(self):
         # TODO: You must implement this!
-        if self.direct_messenger.send(self.body.get_text_entry(), self.recipient):
-            return
-        tk.messagebox.showerror("Error", "Message not sent.")
+        message = self.body.get_text_entry()
+        if self.direct_messenger.send(message, self.recipient):
+            self.body.insert_user_message(message)
+            self.body.set_text_entry('')
+        else:
+            tk.messagebox.showerror("Error", "Message not sent.")
 
     def add_contact(self):
         # TODO: You must implement this!
@@ -186,6 +189,8 @@ class MainApp(tk.Frame):
 
     def recipient_selected(self, recipient):
         self.recipient = recipient
+        self.body.entry_editor.delete(1.0, tk.END)
+        self.check_new()
 
     def configure_server(self):
         ud = NewContactDialog(self.root, "Configure Account",
@@ -204,7 +209,14 @@ class MainApp(tk.Frame):
 
     def check_new(self):
         # TODO: You must implement this!
-        self.direct_messenger.retrieve_new()
+        list_of_new = self.direct_messenger.retrieve_new()
+        if list_of_new:
+            for msg in list_of_new:
+                if self.profile and self.file and msg not in self.profile.direct_messages:
+                    self.profile.direct_messages.append(msg)
+                    self.profile.save_profile(self.file)
+                if msg.recipient == self.recipient:
+                    self.body.insert_contact_message(msg.message)
     
     def open_file(self):
         file = filedialog.askopenfilename()
@@ -218,6 +230,20 @@ class MainApp(tk.Frame):
             self.server = profile.dsuserver
             for friend in profile.friends_list:
                 self.body.insert_contact(friend)
+            self.direct_messenger = ds_messenger.DirectMessenger(self.server, self.username, self.password)
+    
+    def new_file(self):
+        directory = filedialog.askdirectory()
+        if directory:
+            p = Path(directory) / (self.username + ".dsu")
+            self.file = p
+            f = p.open("w+")
+            f.close()
+            user_profile = Profile.Profile(self.server, self.username, self.password)
+            #user_profile.friends_list = self.body._contacts
+            user_profile.direct_messages = self.direct_messenger.retrieve_all()
+            user_profile.save_profile(p)
+            self.profile = user_profile
 
     def _draw(self):
         # Build a menu and add it to the root frame.
@@ -226,7 +252,7 @@ class MainApp(tk.Frame):
         menu_file = tk.Menu(menu_bar)
 
         menu_bar.add_cascade(menu=menu_file, label='File')
-        menu_file.add_command(label='New')
+        menu_file.add_command(label='New', command=self.new_file)
         menu_file.add_command(label='Open...', command=self.open_file)
         menu_file.add_command(label='Close')
 
