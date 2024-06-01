@@ -193,7 +193,7 @@ class Profile:
                     post = Post(post_obj['entry'], post_obj['timestamp'])
                     self._posts.append(post)
                 self.friends_list = obj['friends_list']
-                for dm_obj in obj['_direct_messages']:
+                for dm_obj in obj['direct_messages']:
                     dm = DirectMessage(dm_obj['recipient'], dm_obj['entry'], dm_obj['timestamp'])
                     self.direct_messages.append(dm)
                 f.close()

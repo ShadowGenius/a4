@@ -1,7 +1,9 @@
 import tkinter as tk
 from tkinter import ttk, filedialog
 from typing import Text
-
+import ds_messenger
+import Profile
+from pathlib import Path
 
 class Body(tk.Frame):
     def __init__(self, root, recipient_selected_callback=None):
@@ -93,7 +95,7 @@ class Footer(tk.Frame):
             self._send_callback()
 
     def _draw(self):
-        save_button = tk.Button(master=self, text="Send", width=20)
+        save_button = tk.Button(master=self, text="Send", width=20, command=self.send_click)
         # TODO: You must implement this.
         # Here you must configure the button to bind its click to
         # the send_click() function.
@@ -115,13 +117,13 @@ class NewContactDialog(tk.simpledialog.Dialog):
         self.server_label = tk.Label(frame, width=30, text="DS Server Address")
         self.server_label.pack()
         self.server_entry = tk.Entry(frame, width=30)
-        self.server_entry.insert(tk.END, self.server)
+        self.server_entry.insert(tk.END, self.server if self.server is not None else '')
         self.server_entry.pack()
 
         self.username_label = tk.Label(frame, width=30, text="Username")
         self.username_label.pack()
         self.username_entry = tk.Entry(frame, width=30)
-        self.username_entry.insert(tk.END, self.user)
+        self.username_entry.insert(tk.END, self.user if self.user is not None else '')
         self.username_entry.pack()
 
         # TODO: You need to implement also the region for the user to enter
@@ -130,6 +132,12 @@ class NewContactDialog(tk.simpledialog.Dialog):
         # such that when the user types, the only thing that appears are
         # * symbols.
         #self.password...
+        self.password_label = tk.Label(frame, width=30, text="Password")
+        self.password_label.pack()
+        self.password_entry = tk.Entry(frame, width=30)
+        self.password_entry.insert(tk.END, self.pwd if self.pwd is not None else '')
+        self.password_entry['show'] = '*'
+        self.password_entry.pack()
 
 
     def apply(self):
@@ -149,23 +157,32 @@ class MainApp(tk.Frame):
         # TODO: You must implement this! You must configure and
         # instantiate your DirectMessenger instance after this line.
         #self.direct_messenger = ... continue!
+        self.direct_messenger = ds_messenger.DirectMessenger()
+        self.profile = None
+        self.file = None
 
         # After all initialization is complete,
         # call the _draw method to pack the widgets
         # into the root frame
         self._draw()
-        self.body.insert_contact("studentexw23") # adding one example student.
+        #self.body.insert_contact("studentexw23") # adding one example student.
 
     def send_message(self):
         # TODO: You must implement this!
-        pass
+        if self.direct_messenger.send(self.body.get_text_entry(), self.recipient):
+            return
+        tk.messagebox.showerror("Error", "Message not sent.")
 
     def add_contact(self):
         # TODO: You must implement this!
         # Hint: check how to use tk.simpledialog.askstring to retrieve
         # the name of the new contact, and then use one of the body
         # methods to add the contact to your contact list
-        pass
+        contact_name = tk.simpledialog.askstring("Add contact.", "Contact name")
+        if self.profile and self.file:
+            self.profile.friends_list.append(contact_name)
+            self.profile.save_profile(self.file)
+        self.body.insert_contact(contact_name)
 
     def recipient_selected(self, recipient):
         self.recipient = recipient
@@ -179,6 +196,7 @@ class MainApp(tk.Frame):
         # TODO: You must implement this!
         # You must configure and instantiate your
         # DirectMessenger instance after this line.
+        self.direct_messenger = ds_messenger.DirectMessenger(self.server, self.username, self.password)
 
     def publish(self, message:str):
         # TODO: You must implement this!
@@ -186,7 +204,20 @@ class MainApp(tk.Frame):
 
     def check_new(self):
         # TODO: You must implement this!
-        pass
+        self.direct_messenger.retrieve_new()
+    
+    def open_file(self):
+        file = filedialog.askopenfilename()
+        if file:
+            self.file = file
+            profile = Profile.Profile()
+            profile.load_profile(file)
+            self.profile = profile
+            self.username = profile.username
+            self.password = profile.password
+            self.server = profile.dsuserver
+            for friend in profile.friends_list:
+                self.body.insert_contact(friend)
 
     def _draw(self):
         # Build a menu and add it to the root frame.
@@ -196,7 +227,7 @@ class MainApp(tk.Frame):
 
         menu_bar.add_cascade(menu=menu_file, label='File')
         menu_file.add_command(label='New')
-        menu_file.add_command(label='Open...')
+        menu_file.add_command(label='Open...', command=self.open_file)
         menu_file.add_command(label='Close')
 
         settings_file = tk.Menu(menu_bar)
