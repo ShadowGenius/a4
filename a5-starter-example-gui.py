@@ -9,7 +9,7 @@ class Body(tk.Frame):
     def __init__(self, root, recipient_selected_callback=None):
         tk.Frame.__init__(self, root)
         self.root = root
-        self._contacts = [str]
+        self._contacts: list[str] = []
         self._select_callback = recipient_selected_callback
         # After all initialization is complete,
         # call the _draw method to pack the widgets
@@ -31,6 +31,9 @@ class Body(tk.Frame):
         if len(contact) > 25:
             entry = contact[:24] + "..."
         id = self.posts_tree.insert('', id, id, text=contact)
+
+    def get_contacts(self):
+        return self._contacts
 
     def insert_user_message(self, message:str):
         self.entry_editor.insert(1.0, message + '\n', 'entry-right')
@@ -96,9 +99,6 @@ class Footer(tk.Frame):
 
     def _draw(self):
         save_button = tk.Button(master=self, text="Send", width=20, command=self.send_click)
-        # TODO: You must implement this.
-        # Here you must configure the button to bind its click to
-        # the send_click() function.
         save_button.pack(fill=tk.BOTH, side=tk.RIGHT, padx=5, pady=5)
 
         self.footer_label = tk.Label(master=self, text="Ready.")
@@ -126,12 +126,6 @@ class NewContactDialog(tk.simpledialog.Dialog):
         self.username_entry.insert(tk.END, self.user if self.user is not None else '')
         self.username_entry.pack()
 
-        # TODO: You need to implement also the region for the user to enter
-        # the Password. The code is similar to the Username you see above
-        # but you will want to add self.password_entry['show'] = '*'
-        # such that when the user types, the only thing that appears are
-        # * symbols.
-        #self.password...
         self.password_label = tk.Label(frame, width=30, text="Password")
         self.password_label.pack()
         self.password_entry = tk.Entry(frame, width=30)
@@ -154,9 +148,6 @@ class MainApp(tk.Frame):
         self.password = None
         self.server = None
         self.recipient = None
-        # TODO: You must implement this! You must configure and
-        # instantiate your DirectMessenger instance after this line.
-        #self.direct_messenger = ... continue!
         self.direct_messenger = ds_messenger.DirectMessenger()
         self.profile = None
         self.file = None
@@ -173,19 +164,21 @@ class MainApp(tk.Frame):
         if self.direct_messenger.send(message, self.recipient):
             self.body.insert_user_message(message)
             self.body.set_text_entry('')
+            if self.profile and self.file:
+                for dm in self.direct_messenger.dms_out:
+                    if dm not in self.profile.direct_messages:
+                        self.profile.direct_messages.append(dm)
+                self.profile.save_profile(self.file)
         else:
             tk.messagebox.showerror("Error", "Message not sent.")
 
     def add_contact(self):
-        # TODO: You must implement this!
-        # Hint: check how to use tk.simpledialog.askstring to retrieve
-        # the name of the new contact, and then use one of the body
-        # methods to add the contact to your contact list
         contact_name = tk.simpledialog.askstring("Add contact.", "Contact name")
-        if self.profile and self.file:
-            self.profile.friends_list.append(contact_name)
-            self.profile.save_profile(self.file)
-        self.body.insert_contact(contact_name)
+        if contact_name:
+            self.body.insert_contact(contact_name)
+            if self.profile and self.file:
+                self.profile.friends_list.append(contact_name)
+                self.profile.save_profile(self.file)
 
     def recipient_selected(self, recipient):
         self.recipient = recipient
@@ -198,26 +191,48 @@ class MainApp(tk.Frame):
         self.username = ud.user
         self.password = ud.pwd
         self.server = ud.server
-        # TODO: You must implement this!
-        # You must configure and instantiate your
-        # DirectMessenger instance after this line.
-        self.direct_messenger = ds_messenger.DirectMessenger(self.server, self.username, self.password)
+        self.direct_messenger = ds_messenger.DirectMessenger(self.server,
+                                                             self.username,
+                                                             self.password)
 
     def publish(self, message:str):
         # TODO: You must implement this!
         pass
 
     def check_new(self):
-        # TODO: You must implement this!
+        if self.profile:
+            list_of_dms = self.profile.direct_messages
+            list_of_dms += self.direct_messenger.retrieve_new()
+        else:
+            list_of_dms = self.direct_messenger.retrieve_all()
+            list_of_dms += self.direct_messenger.dms_out
+            list_of_dms = Profile.recursive_sort(list_of_dms)
+        if len(list_of_dms) > 0:
+            self.update_new(list_of_dms)
+        # elif self.profile and not self.direct_messenger.token:
+        #     for msg in self.profile.direct_messages:
+        #         self.insert_message(msg)
+        self.check_new_loop()
+
+    def insert_message(self, msg):
+        if msg.sender == self.recipient:
+            self.body.insert_contact_message(msg.message)
+        elif msg.sender == self.username and msg.recipient == self.recipient:
+            self.body.insert_user_message(msg.message)
+
+    def update_new(self, list_of_dms):
+        for msg in list_of_dms:
+            if self.profile and self.file and msg not in self.profile.direct_messages:
+                self.profile.direct_messages.append(msg)
+                self.profile.save_profile(self.file)
+            self.insert_message(msg)
+
+    def check_new_loop(self):
         list_of_new = self.direct_messenger.retrieve_new()
-        if list_of_new:
-            for msg in list_of_new:
-                if self.profile and self.file and msg not in self.profile.direct_messages:
-                    self.profile.direct_messages.append(msg)
-                    self.profile.save_profile(self.file)
-                if msg.recipient == self.recipient:
-                    self.body.insert_contact_message(msg.message)
-    
+        if len(list_of_new) > 0:
+            self.update_new(list_of_new)
+        self.root.after(2000, self.check_new_loop)
+
     def open_file(self):
         file = filedialog.askopenfilename()
         if file:
@@ -230,8 +245,10 @@ class MainApp(tk.Frame):
             self.server = profile.dsuserver
             for friend in profile.friends_list:
                 self.body.insert_contact(friend)
-            self.direct_messenger = ds_messenger.DirectMessenger(self.server, self.username, self.password)
-    
+            self.direct_messenger = ds_messenger.DirectMessenger(self.server,
+                                                                 self.username,
+                                                                 self.password)
+
     def new_file(self):
         directory = filedialog.askdirectory()
         if directory:
@@ -240,7 +257,7 @@ class MainApp(tk.Frame):
             f = p.open("w+")
             f.close()
             user_profile = Profile.Profile(self.server, self.username, self.password)
-            #user_profile.friends_list = self.body._contacts
+            user_profile.friends_list = self.body.get_contacts()
             user_profile.direct_messages = self.direct_messenger.retrieve_all()
             user_profile.save_profile(p)
             self.profile = user_profile

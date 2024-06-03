@@ -194,10 +194,31 @@ class Profile:
                     self._posts.append(post)
                 self.friends_list = obj['friends_list']
                 for dm_obj in obj['direct_messages']:
-                    dm = DirectMessage(dm_obj['recipient'], dm_obj['entry'], dm_obj['timestamp'])
+                    dm = DirectMessage(dm_obj['recipient'],
+                                       dm_obj['entry'],
+                                       dm_obj['timestamp'],
+                                       dm_obj['sender'])
                     self.direct_messages.append(dm)
+                self.sort_dms()
                 f.close()
             except Exception as ex:
                 raise DsuProfileError(ex)
         else:
             raise DsuFileError()
+
+    def sort_dms(self):
+        self.direct_messages = recursive_sort(self.direct_messages)
+
+def recursive_sort(lst):
+    sorted_lst = lst[:]
+    og_lst = lst[:]
+    for (index, dm) in enumerate(sorted_lst):
+        if index < len(sorted_lst) - 1:
+            dm2 = sorted_lst[index + 1]
+            if str(dm['timestamp']) > str(dm2['timestamp']):
+                sorted_lst[index] = dm2
+                sorted_lst[index + 1] = dm
+    if sorted_lst == og_lst:
+        return sorted_lst
+    else:
+        return recursive_sort(sorted_lst)

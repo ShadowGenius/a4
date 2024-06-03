@@ -5,19 +5,24 @@ import ds_protocol
 PORT = 3021
 
 class DirectMessage(dict):
-    def __init__(self, recipient, message, timestamp = 0):
+    def __init__(self, recipient, message, timestamp = 0, sender = None):
         self.recipient = recipient
         self.message = message
         self.timestamp = timestamp
+        self.sender = sender
         if self.timestamp == 0:
             self.timestamp = time.time()
-        dict.__init__(self, entry=self.message, recipient=self.recipient, timestamp=self.timestamp)
+        dict.__init__(self, entry=self.message,
+                      recipient=self.recipient,
+                      timestamp=self.timestamp,
+                      sender=self.sender)
 
 class DirectMessenger:
     def __init__(self, dsuserver=None, username=None, password=None):
         self.dsuserver = dsuserver
         self.username = username
         self.password = password
+        self.dms_out = []
         if self.dsuserver is None:
             self.sent = None
             self.recv = None
@@ -31,7 +36,8 @@ class DirectMessenger:
     def send(self, message:str, recipient:str) -> bool:
         ''' returns true if message successfully sent, false if send failed. '''
         if self.sent and self.recv:
-            new_dm = DirectMessage(recipient, message)
+            new_dm = DirectMessage(recipient, message, 0, self.username)
+            self.dms_out.append(new_dm)
             new_dm = json.dumps(new_dm)
             post_msg = f'{{"token":"{self.token}", "directmessage": {new_dm}}}'
             recv_msg = send_and_recv(self.sent, self.recv, post_msg)
@@ -56,7 +62,7 @@ class DirectMessenger:
             recv_msg = send_and_recv(self.sent, self.recv, retrieve_msg)
             if recv_msg.type == "ok" and isinstance(recv_msg.messages, list):
                 for msg in recv_msg.messages:
-                    dm = DirectMessage(msg["from"], msg["message"], msg["timestamp"])
+                    dm = DirectMessage(self.username, msg["message"], msg["timestamp"], msg["from"])
                     dm_list.append(dm)
         return dm_list
 
@@ -79,6 +85,8 @@ def join_server(dsuserver, username, password):
 
     except socket.gaierror:
         print("ERROR: Server address invalid.")
+    except OSError:
+        print("ERROR: No internet")
     return sent, recv, token
 
 def send_and_recv(sent, recv, msg_to_send):
@@ -88,5 +96,6 @@ def send_and_recv(sent, recv, msg_to_send):
 
     resp = recv.readline()
     recv_msg = ds_protocol.extract_json(resp)
-    print(recv_msg.message)
+    if recv_msg.message:
+        print(recv_msg.message)
     return recv_msg
