@@ -1,10 +1,15 @@
-import json, socket, time
+'''Module for handing direct messages in the DS server'''
+
+import json
+import socket
+import time
 import ds_protocol
 #from ds_client import send_and_recv
 
 PORT = 3021
 
 class DirectMessage(dict):
+    '''Class for individual direct messages.'''
     def __init__(self, recipient, message, timestamp = 0, sender = None):
         self.recipient = recipient
         self.message = message
@@ -18,6 +23,7 @@ class DirectMessage(dict):
                       sender=self.sender)
 
 class DirectMessenger:
+    '''Class for handling sending and recieving direct messages.'''
     def __init__(self, dsuserver=None, username=None, password=None):
         self.dsuserver = dsuserver
         self.username = username
@@ -28,20 +34,19 @@ class DirectMessenger:
             self.recv = None
             self.token = None
         else:
-            self.sent, self.recv, self.token = join_server(self.dsuserver, self.username, self.password)
-    
-    def get_token(self):
-        self.sent, self.recv, self.token = join_server(self.dsuserver, self.username, self.password)
+            self.sent, self.recv, self.token = join_server(self.dsuserver,
+                                                           self.username,
+                                                           self.password)
 
     def send(self, message:str, recipient:str) -> bool:
         ''' returns true if message successfully sent, false if send failed. '''
         if self.sent and self.recv:
             new_dm = DirectMessage(recipient, message, 0, self.username)
-            self.dms_out.append(new_dm)
-            new_dm = json.dumps(new_dm)
-            post_msg = f'{{"token":"{self.token}", "directmessage": {new_dm}}}'
+            new_dm_str = json.dumps(new_dm)
+            post_msg = f'{{"token":"{self.token}", "directmessage": {new_dm_str}}}'
             recv_msg = send_and_recv(self.sent, self.recv, post_msg)
             if recv_msg.type == "ok":
+                self.dms_out.append(new_dm)
                 return True
         return False
 
@@ -67,6 +72,7 @@ class DirectMessenger:
         return dm_list
 
 def join_server(dsuserver, username, password):
+    '''Joins the DSU server using the given username and password.'''
     client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sent, recv, token = (None, None, None)
     try:

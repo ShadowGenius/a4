@@ -1,3 +1,5 @@
+'''Module for GUI for Assignment 4'''
+
 import tkinter as tk
 from tkinter import ttk, filedialog
 from pathlib import Path
@@ -104,6 +106,7 @@ class Footer(tk.Frame):
         self._draw()
 
     def send_click(self):
+        '''Calls the function associated with the "Send" button.'''
         if self._send_callback is not None:
             self._send_callback()
 
@@ -116,6 +119,7 @@ class Footer(tk.Frame):
 
 
 class NewContactDialog(tk.simpledialog.Dialog):
+    '''Dialog for a user to add a new contact.'''
     def __init__(self, root, title=None, user=None, pwd=None, server=None):
         self.root = root
         self.server = server
