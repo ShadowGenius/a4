@@ -1,11 +1,11 @@
 import tkinter as tk
 from tkinter import ttk, filedialog
-from typing import Text
+from pathlib import Path
 import ds_messenger
 import Profile
-from pathlib import Path
 
 class Body(tk.Frame):
+    '''Body of the GUI'''
     def __init__(self, root, recipient_selected_callback=None):
         tk.Frame.__init__(self, root)
         self.root = root
@@ -17,34 +17,43 @@ class Body(tk.Frame):
         self._draw()
 
     def node_select(self, event):
+        '''Calls the function when a contact is selected.'''
         index = int(self.posts_tree.selection()[0])
         entry = self._contacts[index]
         if self._select_callback is not None:
             self._select_callback(entry)
 
     def insert_contact(self, contact: str):
+        '''Inserts a contact in to the contact tree.'''
         self._contacts.append(contact)
-        id = len(self._contacts) - 1
-        self._insert_contact_tree(id, contact)
+        contact_id = len(self._contacts) - 1
+        self._insert_contact_tree(contact_id, contact)
 
-    def _insert_contact_tree(self, id, contact: str):
+    def _insert_contact_tree(self, contact_id, contact: str):
         if len(contact) > 25:
             entry = contact[:24] + "..."
-        id = self.posts_tree.insert('', id, id, text=contact)
+        else:
+            entry = contact
+        contact_id = self.posts_tree.insert('', contact_id, contact_id, text=entry)
 
     def get_contacts(self):
+        '''Returns the currently added contacts.'''
         return self._contacts
 
     def insert_user_message(self, message:str):
+        '''Inserts messages into the body on the user side, which is the right.'''
         self.entry_editor.insert(1.0, message + '\n', 'entry-right')
 
     def insert_contact_message(self, message:str):
+        '''Inserts messages into the body on the contact side, which is the left.'''
         self.entry_editor.insert(1.0, message + '\n', 'entry-left')
 
     def get_text_entry(self) -> str:
+        '''Returns the text in the message editor.'''
         return self.message_editor.get('1.0', 'end').rstrip()
 
     def set_text_entry(self, text:str):
+        '''Replaces current text in the messager editor with text argument.'''
         self.message_editor.delete(1.0, tk.END)
         self.message_editor.insert(1.0, text)
 
@@ -87,6 +96,7 @@ class Body(tk.Frame):
 
 
 class Footer(tk.Frame):
+    '''Footer of the GUI'''
     def __init__(self, root, send_callback=None):
         tk.Frame.__init__(self, root)
         self.root = root
@@ -141,6 +151,7 @@ class NewContactDialog(tk.simpledialog.Dialog):
 
 
 class MainApp(tk.Frame):
+    '''Main functionality of the application.'''
     def __init__(self, root):
         tk.Frame.__init__(self, root)
         self.root = root
@@ -159,20 +170,15 @@ class MainApp(tk.Frame):
         #self.body.insert_contact("studentexw23") # adding one example student.
 
     def send_message(self):
-        # TODO: You must implement this!
+        '''Sends a message or gives an error if message couldn't be sent.'''
         message = self.body.get_text_entry()
         if self.direct_messenger.send(message, self.recipient):
-            self.body.insert_user_message(message)
-            self.body.set_text_entry('')
-            if self.profile and self.file:
-                for dm in self.direct_messenger.dms_out:
-                    if dm not in self.profile.direct_messages:
-                        self.profile.direct_messages.append(dm)
-                self.profile.save_profile(self.file)
+            self.publish(message)
         else:
             tk.messagebox.showerror("Error", "Message not sent.")
 
     def add_contact(self):
+        '''Asks and adds a contact to the tree and Profile (if any).'''
         contact_name = tk.simpledialog.askstring("Add contact.", "Contact name")
         if contact_name:
             self.body.insert_contact(contact_name)
@@ -181,11 +187,14 @@ class MainApp(tk.Frame):
                 self.profile.save_profile(self.file)
 
     def recipient_selected(self, recipient):
+        '''Sets the current recipient to the one just selected and displays messages.'''
         self.recipient = recipient
         self.body.entry_editor.delete(1.0, tk.END)
         self.check_new()
 
     def configure_server(self):
+        '''Allows the user to set their server IP, username, 
+        and password to configure the DirectMessenger.'''
         ud = NewContactDialog(self.root, "Configure Account",
                               self.username, self.password, self.server)
         self.username = ud.user
@@ -196,10 +205,17 @@ class MainApp(tk.Frame):
                                                              self.password)
 
     def publish(self, message:str):
-        # TODO: You must implement this!
-        pass
+        '''Publishes sent messages to the body.'''
+        self.body.insert_user_message(message)
+        self.body.set_text_entry('')
+        if self.profile and self.file:
+            for dm in self.direct_messenger.dms_out:
+                if dm not in self.profile.direct_messages:
+                    self.profile.direct_messages.append(dm)
+            self.profile.save_profile(self.file)
 
     def check_new(self):
+        '''Retrieves all messages to update the body with.'''
         if self.profile:
             list_of_dms = self.profile.direct_messages
             list_of_dms += self.direct_messenger.retrieve_new()
@@ -215,12 +231,15 @@ class MainApp(tk.Frame):
         self.check_new_loop()
 
     def insert_message(self, msg):
+        '''Inserts a message into the message body based on the sender and recipient.'''
         if msg.sender == self.recipient:
             self.body.insert_contact_message(msg.message)
         elif msg.sender == self.username and msg.recipient == self.recipient:
             self.body.insert_user_message(msg.message)
 
     def update_new(self, list_of_dms):
+        '''Given a list of DMs, adds them to the currently 
+        loaded Profile (if any) and inserts them into the body.'''
         for msg in list_of_dms:
             if self.profile and self.file and msg not in self.profile.direct_messages:
                 self.profile.direct_messages.append(msg)
@@ -228,12 +247,14 @@ class MainApp(tk.Frame):
             self.insert_message(msg)
 
     def check_new_loop(self):
+        '''Looping function to check for new messages and calls update_new if there are any.'''
         list_of_new = self.direct_messenger.retrieve_new()
         if len(list_of_new) > 0:
             self.update_new(list_of_new)
         self.root.after(2000, self.check_new_loop)
 
     def open_file(self):
+        '''Opens a .dsu file and loads its relevant information.'''
         file = filedialog.askopenfilename()
         if file:
             self.file = file
@@ -250,6 +271,8 @@ class MainApp(tk.Frame):
                                                                  self.password)
 
     def new_file(self):
+        '''Creates a new .dsu file based on currently entered 
+        username, password, server ip, messages, and contacts.'''
         directory = filedialog.askdirectory()
         if directory:
             p = Path(directory) / (self.username + ".dsu")
@@ -319,8 +342,8 @@ if __name__ == "__main__":
     # behavior of the window changes.
     main.update()
     main.minsize(main.winfo_width(), main.winfo_height())
-    id = main.after(2000, app.check_new)
-    print(id)
+    after_id = main.after(2000, app.check_new)
+    print(after_id)
     # And finally, start up the event loop for the program (you can find
     # more on this in lectures of week 9 and 10).
     main.mainloop()
