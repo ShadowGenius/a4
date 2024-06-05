@@ -92,7 +92,7 @@ def join_server(dsuserver, username, password):
     except socket.gaierror:
         print("ERROR: Server address invalid.")
     except OSError:
-        print("ERROR: No internet")
+        print("ERROR: No connection.")
     return sent, recv, token
 
 def send_and_recv(sent, recv, msg_to_send):

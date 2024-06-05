@@ -283,9 +283,10 @@ class MainApp(tk.Frame):
 
     def check_new_loop(self):
         '''Looping function to check for new messages and calls update_new if there are any.'''
-        list_of_new = self.direct_messenger.retrieve_new()
-        if len(list_of_new) > 0:
-            self.update_new(list_of_new)
+        if self.direct_messenger.token is not None:
+            list_of_new = self.direct_messenger.retrieve_new()
+            if len(list_of_new) > 0:
+                self.update_new(list_of_new)
         self.root.after(2000, self.check_new_loop)
 
     def open_file(self):
