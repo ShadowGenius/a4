@@ -20,10 +20,11 @@ class Body(tk.Frame):
 
     def node_select(self, event):
         '''Calls the function when a contact is selected.'''
-        index = int(self.posts_tree.selection()[0])
-        entry = self._contacts[index]
-        if self._select_callback is not None:
-            self._select_callback(entry)
+        if event and len(self.posts_tree.selection()) > 0:
+            index = int(self.posts_tree.selection()[0])
+            entry = self._contacts[index]
+            if self._select_callback is not None:
+                self._select_callback(entry)
 
     def insert_contact(self, contact: str):
         '''Inserts a contact in to the contact tree.'''
@@ -38,17 +39,36 @@ class Body(tk.Frame):
             entry = contact
         contact_id = self.posts_tree.insert('', contact_id, contact_id, text=entry)
 
+    def remove_contact(self, contact: str):
+        '''Removes a contact from the contact tree.'''
+        if contact in self._contacts:
+            contact_id = self._contacts.index(contact)
+            self._remove_contact_tree(contact_id)
+
+    def _remove_contact_tree(self, contact_id):
+        self.posts_tree.delete(contact_id)
+
     def get_contacts(self):
         '''Returns the currently added contacts.'''
         return self._contacts
 
+    def clear_contacts(self):
+        '''Removes all contacts.'''
+        for contact in self._contacts:
+            self.remove_contact(contact)
+        self._contacts: list[str] = []
+
     def insert_user_message(self, message:str):
         '''Inserts messages into the body on the user side, which is the right.'''
-        self.entry_editor.insert(1.0, message + '\n', 'entry-right')
+        self.entry_editor.insert(tk.END, message + '\n', ['entry-right', 'red'])
 
     def insert_contact_message(self, message:str):
         '''Inserts messages into the body on the contact side, which is the left.'''
-        self.entry_editor.insert(1.0, message + '\n', 'entry-left')
+        self.entry_editor.insert(tk.END, message + '\n', ['entry-left', 'blue'])
+
+    def clear_messages(self):
+        '''Clears all messages in the entry editor.'''
+        self.entry_editor.delete(1.0, tk.END)
 
     def get_text_entry(self) -> str:
         '''Returns the text in the message editor.'''
@@ -87,6 +107,8 @@ class Body(tk.Frame):
         self.entry_editor = tk.Text(editor_frame, width=0, height=5)
         self.entry_editor.tag_configure('entry-right', justify='right')
         self.entry_editor.tag_configure('entry-left', justify='left')
+        self.entry_editor.tag_configure('blue', foreground="blue")
+        self.entry_editor.tag_configure('red', foreground="red")
         self.entry_editor.pack(fill=tk.BOTH, side=tk.LEFT,
                                expand=True, padx=0, pady=0)
 
@@ -99,10 +121,11 @@ class Body(tk.Frame):
 
 class Footer(tk.Frame):
     '''Footer of the GUI'''
-    def __init__(self, root, send_callback=None):
+    def __init__(self, root, send_callback=None, add_callback=None):
         tk.Frame.__init__(self, root)
         self.root = root
         self._send_callback = send_callback
+        self._add_callback = add_callback
         self._draw()
 
     def send_click(self):
@@ -110,12 +133,20 @@ class Footer(tk.Frame):
         if self._send_callback is not None:
             self._send_callback()
 
+    def add_click(self):
+        '''Calls the function associated with the "Add Contact" button.'''
+        if self._add_callback is not None:
+            self._add_callback()
+
     def _draw(self):
         save_button = tk.Button(master=self, text="Send", width=20, command=self.send_click)
         save_button.pack(fill=tk.BOTH, side=tk.RIGHT, padx=5, pady=5)
 
         self.footer_label = tk.Label(master=self, text="Ready.")
         self.footer_label.pack(fill=tk.BOTH, side=tk.LEFT, padx=5)
+
+        add_button = tk.Button(master=self, text="Add Contact", width=15, command=self.add_click)
+        add_button.pack(fill=tk.BOTH, side=tk.LEFT, padx=35, pady=5)
 
 
 class NewContactDialog(tk.simpledialog.Dialog):
@@ -127,22 +158,22 @@ class NewContactDialog(tk.simpledialog.Dialog):
         self.pwd = pwd
         super().__init__(root, title)
 
-    def body(self, frame):
-        self.server_label = tk.Label(frame, width=30, text="DS Server Address")
+    def body(self, master):
+        self.server_label = tk.Label(master, width=30, text="DS Server Address")
         self.server_label.pack()
-        self.server_entry = tk.Entry(frame, width=30)
+        self.server_entry = tk.Entry(master, width=30)
         self.server_entry.insert(tk.END, self.server if self.server is not None else '')
         self.server_entry.pack()
 
-        self.username_label = tk.Label(frame, width=30, text="Username")
+        self.username_label = tk.Label(master, width=30, text="Username")
         self.username_label.pack()
-        self.username_entry = tk.Entry(frame, width=30)
+        self.username_entry = tk.Entry(master, width=30)
         self.username_entry.insert(tk.END, self.user if self.user is not None else '')
         self.username_entry.pack()
 
-        self.password_label = tk.Label(frame, width=30, text="Password")
+        self.password_label = tk.Label(master, width=30, text="Password")
         self.password_label.pack()
-        self.password_entry = tk.Entry(frame, width=30)
+        self.password_entry = tk.Entry(master, width=30)
         self.password_entry.insert(tk.END, self.pwd if self.pwd is not None else '')
         self.password_entry['show'] = '*'
         self.password_entry.pack()
@@ -182,7 +213,7 @@ class MainApp(tk.Frame):
             tk.messagebox.showerror("Error", "Message not sent.")
 
     def add_contact(self):
-        '''Asks and adds a contact to the tree and Profile (if any).'''
+        '''Asks for a contact to add to the tree and Profile (if any).'''
         contact_name = tk.simpledialog.askstring("Add contact.", "Contact name")
         if contact_name:
             self.body.insert_contact(contact_name)
@@ -261,6 +292,7 @@ class MainApp(tk.Frame):
         '''Opens a .dsu file and loads its relevant information.'''
         file = filedialog.askopenfilename()
         if file:
+            self.close_file()
             self.file = file
             profile = Profile.Profile()
             profile.load_profile(file)
@@ -289,6 +321,28 @@ class MainApp(tk.Frame):
             user_profile.save_profile(p)
             self.profile = user_profile
 
+    def close_file(self):
+        '''Clears all loaded user information if a file is loaded.'''
+        if self.profile is not None:
+            self.body.clear_contacts()
+            self.username = ''
+            self.password = ''
+            self.server = ''
+            self.recipient = None
+            self.direct_messenger = ds_messenger.DirectMessenger()
+            self.profile = None
+            self.file = None
+            self.body.clear_messages()
+
+    def remove_contact(self):
+        '''Asks for a contact to remove from the tree and Profile (if any).'''
+        contact_name = tk.simpledialog.askstring("Remove Contact.", "Contact name")
+        if contact_name:
+            self.body.remove_contact(contact_name)
+            if self.profile and self.file and contact_name in self.profile.friends_list:
+                self.profile.friends_list.remove(contact_name)
+                self.profile.save_profile(self.file)
+
     def _draw(self):
         # Build a menu and add it to the root frame.
         menu_bar = tk.Menu(self.root)
@@ -298,21 +352,22 @@ class MainApp(tk.Frame):
         menu_bar.add_cascade(menu=menu_file, label='File')
         menu_file.add_command(label='New', command=self.new_file)
         menu_file.add_command(label='Open...', command=self.open_file)
-        menu_file.add_command(label='Close')
+        menu_file.add_command(label='Close', command=self.close_file)
 
         settings_file = tk.Menu(menu_bar)
         menu_bar.add_cascade(menu=settings_file, label='Settings')
-        settings_file.add_command(label='Add Contact',
-                                  command=self.add_contact)
         settings_file.add_command(label='Configure DS Server',
                                   command=self.configure_server)
+        settings_file.add_command(label='Remove Contact',
+                                  command=self.remove_contact)
 
         # The Body and Footer classes must be initialized and
         # packed into the root window.
         self.body = Body(self.root,
                          recipient_selected_callback=self.recipient_selected)
         self.body.pack(fill=tk.BOTH, side=tk.TOP, expand=True)
-        self.footer = Footer(self.root, send_callback=self.send_message)
+        self.footer = Footer(self.root, send_callback=self.send_message,
+                             add_callback=self.add_contact)
         self.footer.pack(fill=tk.BOTH, side=tk.BOTTOM)
 
 
