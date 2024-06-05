@@ -10,11 +10,12 @@
 # You should review this code to identify what features you need to support
 # in your program for assignment 2.
 #
-# YOU DO NOT NEED TO READ OR UNDERSTAND THE JSON SERIALIZATION ASPECTS OF THIS CODE 
-# RIGHT NOW, though can you certainly take a look at it if you are curious since we 
+# YOU DO NOT NEED TO READ OR UNDERSTAND THE JSON SERIALIZATION ASPECTS OF THIS CODE
+# RIGHT NOW, though can you certainly take a look at it if you are curious since we
 # already covered a bit of the JSON format in class.
 #
-import json, time
+import json
+import time
 from pathlib import Path
 from ds_messenger import DirectMessage
 
@@ -25,7 +26,6 @@ class DsuFileError(Exception):
     is raised when attempting to load or save Profile objects to file the system.
 
     """
-    pass
 
 class DsuProfileError(Exception):
     """
@@ -33,7 +33,6 @@ class DsuProfileError(Exception):
     is raised when attempting to deserialize a dsu file to a Profile object.
 
     """
-    pass
 
 class Post(dict):
     """ 
@@ -52,7 +51,8 @@ class Post(dict):
         dict.__init__(self, entry=self._entry, timestamp=self._timestamp)
 
     def set_entry(self, entry):
-        self._entry = entry 
+        '''Sets the text entry of the post.'''
+        self._entry = entry
         dict.__setitem__(self, 'entry', entry)
 
         # If timestamp has not been set, generate a new from time module
@@ -60,25 +60,25 @@ class Post(dict):
             self._timestamp = time.time()
 
     def get_entry(self):
+        '''Returns the text entry of the post.'''
         return self._entry
 
-    def set_time(self, time:float):
-        self._timestamp = time
-        dict.__setitem__(self, 'timestamp', time)
+    def set_time(self, current_time:float):
+        '''Sets the timestamp for the post.'''
+        self._timestamp = current_time
+        dict.__setitem__(self, 'timestamp', current_time)
 
     def get_time(self):
+        '''Returns the timestamp of the post.'''
         return self._timestamp
 
-    """
+    # The property method is used to support get and set capability for entry and
+    # time values. When the value for entry is changed, or set, the timestamp field is
+    # updated to the current time.
 
-    The property method is used to support get and set capability for entry and 
-    time values. When the value for entry is changed, or set, the timestamp field is 
-    updated to the current time.
-
-    """ 
     entry = property(get_entry, set_entry)
     timestamp = property(get_time, set_time)
- 
+
 class Profile:
     """
     The Profile class exposes the properties required to join an ICS 32 DSU server. You 
@@ -157,7 +157,7 @@ class Profile:
 
         if p.exists() and p.suffix == '.dsu':
             try:
-                f = open(p, 'w')
+                f = open(p, 'w', encoding="utf-8")
                 json.dump(self.__dict__, f)
                 f.close()
             except Exception as ex:
@@ -183,7 +183,7 @@ class Profile:
 
         if p.exists() and p.suffix == '.dsu':
             try:
-                f = open(p, 'r')
+                f = open(p, 'r', encoding="utf-8")
                 obj = json.load(f)
                 self.username = obj['username']
                 self.password = obj['password']
@@ -207,9 +207,11 @@ class Profile:
             raise DsuFileError()
 
     def sort_dms(self):
+        '''Sorts self.direct_messages bytimestamp.'''
         self.direct_messages = recursive_sort(self.direct_messages)
 
 def recursive_sort(lst):
+    '''Recursively sorts a list of posts or messages by timestamp in ascending order.'''
     sorted_lst = lst[:]
     og_lst = lst[:]
     for (index, dm) in enumerate(sorted_lst):
